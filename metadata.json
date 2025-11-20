@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Pro Workspace",
+  "description": "A professionally structured React application featuring a clean architecture (Service-Controller-View pattern) for interacting with Google's Gemini 2.5 Flash model.",
+  "requestFramePermissions": []
+}
