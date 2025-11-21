@@ -1,6 +1,6 @@
 import { getDistance } from 'geolib';
 import { getFirestore, FieldValue, Firestore } from 'firebase-admin/firestore';
-import { getApps } from 'firebase-admin/app';
+import { getApps, getApp } from 'firebase-admin/app';
 import { GeoPoint, Pharmacy, PharmacyStatus } from '../types/shared';
 
 // ============================================================================
@@ -61,8 +61,10 @@ class PharmacyService {
    * Helper to get the Firestore instance if initialized, or null.
    */
   private getDb(): Firestore | null {
+    // Check if any apps are initialized
     if (getApps().length > 0) {
-      return getFirestore();
+      // Return the Firestore instance for the default app
+      return getFirestore(getApp());
     }
     return null;
   }
@@ -77,22 +79,35 @@ class PharmacyService {
     if (db) {
       // Production: Fetch 'Active' pharmacies from Firestore
       try {
+        console.log('🔍 Querying Firestore for active pharmacies...');
         const snapshot = await db.collection('pharmacies')
           .where('status', '==', PharmacyStatus.ACTIVE)
           .get();
         
         if (!snapshot.empty) {
-          allPharmacies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pharmacy));
+          allPharmacies = snapshot.docs.map(doc => {
+            const data = doc.data();
+            // Convert Firestore Timestamp to Date if necessary, or keep as is depending on frontend needs
+            return { 
+              id: doc.id, 
+              ...data,
+              // Ensure location is formatted correctly if stored differently
+              location: data.location 
+            } as Pharmacy;
+          });
+          console.log(`✅ Found ${allPharmacies.length} pharmacies in DB.`);
         } else {
-          console.log("⚠️ No pharmacies in DB, falling back to Mock data.");
+          console.log("⚠️ No active pharmacies found in Firestore. Falling back to Mock data.");
           allPharmacies = MOCK_PHARMACIES;
         }
       } catch (error) {
-        console.error("DB Read Error:", error);
+        console.error("🔥 Firestore Read Error:", error);
+        console.log("ℹ️ Falling back to Mock data due to DB error.");
         allPharmacies = MOCK_PHARMACIES;
       }
     } else {
       // Dev/Mock Mode
+      console.log('ℹ️ Mock Mode: Returning static pharmacy list.');
       allPharmacies = MOCK_PHARMACIES;
     }
 
@@ -119,29 +134,41 @@ class PharmacyService {
     const db = this.getDb();
     const results: string[] = [];
 
+    // Batch writes are better for performance if we have many, 
+    // but simple loop is fine for < 500 items.
+    const batch = db ? db.batch() : null;
+    let batchCount = 0;
+
     for (const pharmacy of pharmacies) {
-      console.log(`   → 🔔 Notifying: ${pharmacy.name} (${pharmacy._distance}m away)`);
+      console.log(`   → 🔔 Preparing Notification: ${pharmacy.name} (${pharmacy._distance}m away)`);
       
-      if (db) {
-        try {
-          await db.collection('notifications').add({
-            recipientId: pharmacy.id,
-            recipientType: 'Pharmacy', 
-            type: 'NEW_DRUG_REQUEST',
-            title: 'New Request Nearby',
-            body: `A new request matches your inventory location. Distance: ${((pharmacy._distance || 0)/1000).toFixed(1)}km`,
-            data: {
-              requestId: requestId,
-              userLocation: userLocation
-            },
-            createdAt: FieldValue.serverTimestamp(),
-            read: false
-          });
-        } catch (e) {
-          console.error(`Failed to save notification for ${pharmacy.id}`, e);
-        }
+      if (db && batch) {
+        const notificationRef = db.collection('notifications').doc();
+        batch.set(notificationRef, {
+          recipientId: pharmacy.id,
+          recipientType: 'Pharmacy', 
+          type: 'NEW_DRUG_REQUEST',
+          title: 'New Request Nearby',
+          body: `A new request matches your inventory location. Distance: ${((pharmacy._distance || 0)/1000).toFixed(1)}km`,
+          data: {
+            requestId: requestId,
+            userLocation: userLocation
+          },
+          createdAt: FieldValue.serverTimestamp(),
+          read: false
+        });
+        batchCount++;
       }
       results.push(pharmacy.id);
+    }
+
+    if (db && batch && batchCount > 0) {
+      try {
+        await batch.commit();
+        console.log(`✅ Successfully committed ${batchCount} notifications to Firestore.`);
+      } catch (e) {
+        console.error("❌ Failed to commit notifications batch:", e);
+      }
     }
     
     return results;
