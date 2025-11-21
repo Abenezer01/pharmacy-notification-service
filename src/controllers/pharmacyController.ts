@@ -30,6 +30,7 @@ export class PharmacyController {
         console.log("   → No pharmacies found within range.");
         return ResponseUtil.sendSuccess(res, {
           notifiedCount: 0,
+          requestId, userLocation,
           notifiedPharmacies: []
         }, "No nearby pharmacies found.");
       }
