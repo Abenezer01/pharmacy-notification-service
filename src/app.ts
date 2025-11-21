@@ -14,11 +14,24 @@ app.use(cors() as any);   // Enable CORS
 app.use(morgan('dev') as any); // Request logging
 app.use(express.json() as any); // Parse JSON bodies
 
-// Routes
+// Root Route (Welcome & Documentation)
+app.get('/', (req: any, res: any) => {
+  ResponseUtil.sendSuccess(res, {
+    service: 'Pharmacy Notification API',
+    status: 'Active',
+    version: '1.0.0',
+    availableEndpoints: {
+      healthCheck: 'GET /api/v1/health',
+      notifyNearby: 'POST /api/v1/pharmacies/notify-nearby'
+    }
+  }, 'Welcome to the Pharmacy API Backend');
+});
+
+// API Routes
 app.use('/api/v1', routes);
 
 // 404 Handler
-app.use((req, res) => {
+app.use((req: any, res: any) => {
   ResponseUtil.sendError(res, 'Route not found', 404);
 });
 
