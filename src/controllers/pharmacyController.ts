@@ -25,7 +25,7 @@ export class PharmacyController {
     try {
       // 2. Find matching pharmacies (Service Layer)
       const nearbyPharmacies = await pharmacyService.findNearbyPharmacies(userLocation);
-      
+      console.log(`   → Found ${nearbyPharmacies.length} nearby pharmacies.`);
       if (nearbyPharmacies.length === 0) {
         console.log("   → No pharmacies found within range.");
         return ResponseUtil.sendSuccess(res, {

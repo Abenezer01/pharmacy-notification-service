@@ -28,9 +28,9 @@ export enum RequestStatus {
 }
 
 export enum PharmacyStatus {
-  ACTIVE = 'Active',
-  INACTIVE = 'Inactive',
-  PENDING_APPROVAL = 'Pending Approval'
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  PENDING_APPROVAL = 'PENDING_APPROVAL'
 }
 
 /**

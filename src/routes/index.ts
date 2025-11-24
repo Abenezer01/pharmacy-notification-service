@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pharmacyRoutes from './pharmacy.routes';
 import { ResponseUtil } from '../utils/response';
+import { isFirebaseActive } from '../config/firebase';
 
 const router = Router();
 
@@ -11,7 +12,8 @@ router.use('/pharmacies', pharmacyRoutes);
 router.get('/health', (req, res) => {
   ResponseUtil.sendSuccess(res, {
     status: 'OK',
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    firebaseConnected: isFirebaseActive()
   }, 'System Operational');
 });
 

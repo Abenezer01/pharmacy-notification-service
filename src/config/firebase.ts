@@ -5,12 +5,6 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-/**
- * Initializes the Firebase Admin SDK.
- * Priority:
- * 1. 'service-account.json' file in the project root.
- * 2. Google Application Default Credentials (if running on GCP/Cloud Run).
- */
 export const initializeFirebase = (): void => {
   try {
     // Prevent multiple initializations
@@ -18,42 +12,48 @@ export const initializeFirebase = (): void => {
       return;
     }
 
-    // 1. Try to load service-account.json from project root
-    const serviceAccountPath = path.resolve(process.cwd(), 'service-account.json');
+    // 1. LOCAL MODE: service-account-key.json exists on local machine
+    const localKeyPath = path.resolve(process.cwd(), 'service-account-key.json');
 
-    if (fs.existsSync(serviceAccountPath)) {
-      try {
-        const rawData = fs.readFileSync(serviceAccountPath, 'utf8');
-        const serviceAccount = JSON.parse(rawData);
+    if (fs.existsSync(localKeyPath)) {
+      const raw = fs.readFileSync(localKeyPath, 'utf8');
+      const localKey = JSON.parse(raw);
 
-        admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount)
-        });
-        console.log(`✅ [Config] Firebase initialized via service-account.json (Project: ${serviceAccount.project_id})`);
-        return;
-      } catch (parseError) {
-        console.error('❌ [Config] Found service-account.json but failed to parse it:', parseError);
-        // Do not throw here, allow fallback to default credentials or mock mode
-      }
-    } else {
-      console.log('ℹ️ [Config] No service-account.json found in root directory.');
+      admin.initializeApp({
+        credential: admin.credential.cert(localKey),
+      });
+
+      console.log(`✅ Firebase initialized via local service-account-key.json`);
+      return;
     }
 
-    // 2. Try standard Google Application Credentials
-    // This works automatically if GOOGLE_APPLICATION_CREDENTIALS env var is set
-    // or if running inside Google Cloud Platform (Cloud Run, App Engine, Functions)
-    admin.initializeApp();
-    console.log(`✅ [Config] Firebase initialized with Default Credentials.`);
+    console.log('ℹ️ No local service-account-key.json found — falling back to environment variables.');
+
+    // 2. PRODUCTION MODE (Vercel): load from env variable
+    const serviceAccountEnv = process.env.SERVICE_ACCOUNT_KEY;
+
+    if (!serviceAccountEnv) {
+      throw new Error('SERVICE_ACCOUNT_KEY is missing from environment variables.');
+    }
+
+    const serviceAccount = JSON.parse(serviceAccountEnv);
+
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: serviceAccount.project_id,
+        clientEmail: serviceAccount.client_email,
+        privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
+      }),
+    });
+
+    console.log(`✅ Firebase initialized via environment variables (Vercel mode)`);
 
   } catch (error) {
-    console.error('⚠️ [Config] Firebase Initialization Failed:', error);
-    console.log('ℹ️ [Config] App will run in MOCK MODE (Database operations will be simulated).');
+    console.error('❌ Firebase Initialization Failed:', error);
+    console.log('ℹ️ Running in MOCK MODE.');
   }
 };
 
-/**
- * Helper to check if Firebase is actively connected.
- */
 export const isFirebaseActive = (): boolean => {
   return admin.apps.length > 0;
 };

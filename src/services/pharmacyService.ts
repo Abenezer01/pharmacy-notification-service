@@ -1,11 +1,13 @@
 import { getDistance } from 'geolib';
 import { getFirestore, FieldValue, Firestore } from 'firebase-admin/firestore';
 import { getApps, getApp } from 'firebase-admin/app';
+import { initializeFirebase } from '../config/firebase';
+
+// Ensure Firebase is initialized when this module is imported.
+initializeFirebase();
 import { GeoPoint, Pharmacy, PharmacyStatus } from '../types/shared';
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
+
 const MOCK_PHARMACIES: Pharmacy[] = [
   {
     id: 'pharm_dt_sf',
@@ -75,7 +77,7 @@ class PharmacyService {
   public async findNearbyPharmacies(userLocation: GeoPoint): Promise<Pharmacy[]> {
     let allPharmacies: Pharmacy[] = [];
     const db = this.getDb();
-
+    console.log('make sure the db is workign', db);
     if (db) {
       // Production: Fetch 'Active' pharmacies from Firestore
       try {
